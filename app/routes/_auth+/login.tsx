@@ -8,8 +8,9 @@ import { GeneralErrorBoundary } from '~/components/error-boundary.tsx'
 import { Spacer } from '~/components/spacer.tsx'
 import { authenticator, requireAnonymous } from '~/utils/auth.server.ts'
 import { commitSession, getSession } from '~/utils/session.server.ts'
-import { InlineLogin } from '../resources+/login.tsx'
 import { Verifier, unverifiedSessionKey } from '../resources+/verify.tsx'
+import HankoAuth from '~/components/hanko-auth.tsx'
+import { ClientOnly } from 'remix-utils'
 
 export async function loader({ request }: DataFunctionArgs) {
 	await requireAnonymous(request)
@@ -44,15 +45,15 @@ export default function LoginPage() {
 			<div className="mx-auto w-full max-w-md">
 				<div className="flex flex-col gap-3 text-center">
 					<h1 className="text-h1">Welcome back!</h1>
-					<p className="text-body-md text-muted-foreground">
-						Please enter your details.
-					</p>
 				</div>
+				
 				<Spacer size="xs" />
 				{data.unverified ? (
 					<Verifier redirectTo={redirectTo} />
 				) : (
-					<InlineLogin redirectTo={redirectTo} formError={data.formError} />
+					<ClientOnly >
+						{ () => <HankoAuth redirectTo={redirectTo} /> }
+					</ClientOnly>
 				)}
 			</div>
 		</div>

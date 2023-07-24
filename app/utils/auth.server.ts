@@ -6,8 +6,11 @@ import { FormStrategy } from 'remix-auth-form'
 import { prisma } from '~/utils/db.server.ts'
 import { invariant } from './misc.ts'
 import { sessionStorage } from './session.server.ts'
+import * as jose from "jose"
 
 export type { User }
+
+const JWKS_ENDPOINT = `${process.env.HANKO_API_URL}/.well-known/jwks.json`;
 
 export const authenticator = new Authenticator<string>(sessionStorage, {
 	sessionKey: 'sessionId',
@@ -43,6 +46,56 @@ authenticator.use(
 	FormStrategy.name,
 )
 
+function parseCookies (request: Request) {
+    const list: Record<string, any> = {};
+    const cookieHeader = request.headers.get("Cookie");
+    if (!cookieHeader) return list;
+
+    cookieHeader.split(`;`).forEach(function(cookie) {
+        let [ name, ...rest] = cookie.split(`=`);
+        name = name?.trim();
+        if (!name) return;
+        const value = rest.join(`=`).trim();
+        if (!value) return;
+        list[name] = decodeURIComponent(value);
+    });
+
+    return list;
+}
+
+export function getHankoToken(request: Request): string | undefined {
+	const cookies = parseCookies(request)
+	if (cookies.hanko) {
+		return cookies.hanko
+	}
+
+	const authorization = request.headers.get("authorization");
+
+	if (authorization && authorization.split(" ")[0] === "Bearer") {
+		return authorization.split(" ")[1]
+	}
+}
+
+async function getHankoSessionUser(request: Request) {
+	// console.log(request.headers, request.cookies)
+	const token = getHankoToken(request)
+	if (token) {
+		const JWKS_CONFIG = jose.createRemoteJWKSet(new URL(JWKS_ENDPOINT))
+
+		const { payload } = await jose.jwtVerify(token, JWKS_CONFIG);
+		console.log("payload", payload)
+		return payload
+
+		// const res = await fetch(JWKS_ENDPOINT)
+		// const json = await res.json()
+		// console.log("hanko jw", json)
+		// const key = jose.JWK.createKeyStore(json)
+		// key.add(jose.JWK.createKey(json, ))
+		// const hankoVerifyResult = await jose.JWS.createVerify(json as any).verify(token)
+		// console.log("hankoVerifyResult", hankoVerifyResult)
+	}
+  }
+
 export async function requireUserId(
 	request: Request,
 	{ redirectTo }: { redirectTo?: string | null } = {},
@@ -58,32 +111,27 @@ export async function requireUserId(
 	const failureRedirect = ['/login', loginParams?.toString()]
 		.filter(Boolean)
 		.join('?')
-	const sessionId = await authenticator.isAuthenticated(request, {
-		failureRedirect,
-	})
-	const session = await prisma.session.findFirst({
-		where: { id: sessionId },
-		select: { userId: true, expirationDate: true },
-	})
-	if (!session) {
-		throw redirect(failureRedirect)
+	try {
+		const hankoSessionUser = await getHankoSessionUser(request)
+	
+		if (hankoSessionUser) {
+			return hankoSessionUser.sub
+		}
+		return redirect("/auth/signup")
+	} catch (error) {
+		console.log("ERROR VERIFYING STYFF", error)
+		return null
 	}
-	return session.userId
 }
 
 export async function getUserId(request: Request) {
-	const sessionId = await authenticator.isAuthenticated(request)
-	if (!sessionId) return null
-	const session = await prisma.session.findUnique({
-		where: { id: sessionId },
-		select: { userId: true },
-	})
-	if (!session) {
+	const userId = requireUserId(request)
+	if (!userId) {
 		// Perhaps their session was deleted?
 		await authenticator.logout(request, { redirectTo: '/' })
 		return null
 	}
-	return session.userId
+	return userId
 }
 
 export async function requireAnonymous(request: Request) {
