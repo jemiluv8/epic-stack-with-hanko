@@ -10,6 +10,8 @@ const SignUpForm = z.object({
 	email: z.string(),
 })
 
+// this is used by our hanko client to login/signup
+
 export async function action({ request }: DataFunctionArgs) {
 	const userId = await requireUserId(request, { redirectTo: null })
 	const formData = await request.formData()
@@ -30,14 +32,14 @@ export async function action({ request }: DataFunctionArgs) {
 		return json({ status: 'success', submission } as const)
 	}
 	const { email } = submission.value
-	const image = await prisma.image.findFirst({
-		select: { fileId: true },
+	const user = await prisma.user.findFirst({
+		select: { id: true },
 		where: {
-			fileId: imageId,
-			user: { id: userId },
+			email
 		},
 	})
-	if (!image) {
+	if (!user) {
+    // is sign up
 		submission.error.imageId = ['Image not found']
 		return json(
 			{
@@ -48,9 +50,9 @@ export async function action({ request }: DataFunctionArgs) {
 		)
 	}
 
-	await prisma.image.delete({
-		where: { fileId: image.fileId },
-	})
+  // else sign the user in
+
+	
 
 	return json({ status: 'success' } as const)
 }
