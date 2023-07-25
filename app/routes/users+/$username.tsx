@@ -12,8 +12,6 @@ import { prisma } from '~/utils/db.server.ts'
 import { getUserImgSrc, invariantResponse } from '~/utils/misc.ts'
 import { useOptionalUser } from '~/utils/user.ts'
 
-const HANKO_API_URL = ENV.HANKO_API_URL
-
 export async function loader({ params }: DataFunctionArgs) {
 	invariantResponse(params.username, 'Missing username')
 	const user = await prisma.user.findUnique({
@@ -38,20 +36,6 @@ export default function UsernameRoute() {
 	const userDisplayName = user.name ?? user.username
 	const loggedInUser = useOptionalUser()
 	const isLoggedInUser = data.user.id === loggedInUser?.id
-	const [hanko, setHanko] = useState<any>();
-
-	const logout = (event: any) => {
-		if (hanko) {
-			hanko.user.logout()
-			.catch(() => {
-				// show toast?
-			})
-		}
-	}
-
-	useEffect(() => {
-		import("@teamhanko/hanko-elements").then(({ Hanko }: any) => setHanko(new Hanko(HANKO_API_URL)));
-	  }, []);
 
 	return (
 		<div className="container mb-48 mt-36 flex flex-col items-center justify-center">
@@ -80,7 +64,7 @@ export default function UsernameRoute() {
 						Joined {data.userJoinedDisplay}
 					</p>
 					{isLoggedInUser ? (
-						<Form onSubmit={logout} action="/logout" method="POST" className="mt-3">
+						<Form action="/logout" method="POST" className="mt-3">
 							<Button type="submit" variant="secondary" size="pill">
 								Logout
 							</Button>
