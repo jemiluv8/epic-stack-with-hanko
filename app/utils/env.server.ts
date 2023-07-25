@@ -7,6 +7,7 @@ const requiredServerEnvs = [
 	'SESSION_SECRET',
 	'INTERNAL_COMMAND_TOKEN',
 	'CACHE_DATABASE_PATH',
+	'HANKO_API_URL'
 	// If you plan to use Resend, uncomment this line
 	// 'RESEND_API_KEY',
 	// If you plan on using Sentry, uncomment this line
@@ -41,6 +42,7 @@ export function getEnv() {
 	return {
 		MODE: process.env.NODE_ENV,
 		SENTRY_DSN: process.env.SENTRY_DSN,
+		HANKO_API_URL: process.env.HANKO_API_URL
 	}
 }
 

@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { ClientOnly } from 'remix-utils'
 
-const hankoApi = "https://a8661315-1380-4d4e-b64f-cb34ec563cb3.hanko.io"
-
 export interface iProps {
     redirectTo: string;
 }
+
+const HANKO_API_URL = ENV.HANKO_API_URL
 
 export default function HankoAuth({ redirectTo }: iProps) {
 
@@ -20,37 +20,25 @@ export default function HankoAuth({ redirectTo }: iProps) {
     }
 }
 
-  const redirectAfterLogin = useCallback(() => {
-    // successfully logged in, redirect to a page in your application
-    if (redirectTo) {
-      window.location.href = redirectTo
-    } else {
-      window.location.href = "/settings/profile"
-    }
-  }, [redirectTo]);
 
   useEffect(() => hanko?.onAuthFlowCompleted(() => {
     processHanko(hanko)
-  }), [hanko, redirectAfterLogin]);
+  }), [hanko]);
   
   useEffect(() => {
-    // register the component
-    // see: https://github.com/teamhanko/hanko/blob/main/frontend/elements/README.md#script
     import("@teamhanko/hanko-elements").then(({ Hanko, register}: any) => {
-        // setHanko(new module.default(hankoApi));
 
-        register(hankoApi, {  shadow: true, injectStyles: true, hidePasskeyButtonOnLogin: true })
+        register(HANKO_API_URL, {  shadow: true, injectStyles: true, hidePasskeyButtonOnLogin: true })
           .then((res: any) => {
-            const newHanko = new Hanko(hankoApi);
+            const newHanko = new Hanko(HANKO_API_URL);
             setHanko(newHanko)
-            // processHanko(newHanko)
           })
           .catch((error: any) => {
             // handle error
             console.log("hanko register error", error)
           });
     })
-  }, [redirectAfterLogin]);
+  }, []);
 
   return (
     <div className="mx-auto w-full max-w-md px-8 bg-background text-foreground">
