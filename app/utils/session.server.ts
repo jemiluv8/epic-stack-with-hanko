@@ -12,3 +12,14 @@ export const sessionStorage = createCookieSessionStorage({
 })
 
 export const { getSession, commitSession, destroySession } = sessionStorage
+
+
+export const hankoSessionStorage = createCookieSessionStorage({
+	cookie: {
+		name: 'hanko',
+		sameSite: 'none',
+		path: '/',
+		httpOnly: false,
+		secure: true
+	},
+})
