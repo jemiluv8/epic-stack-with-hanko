@@ -73,6 +73,7 @@ export async function getHankoSessionUser(request: Request) {
 	}
 	return null
   }
+}
 
 authenticator.use(
 	new FormStrategy(async ({ form }) => {

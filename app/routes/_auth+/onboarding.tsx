@@ -18,7 +18,7 @@ import { safeRedirect } from 'remix-utils'
 import { z } from 'zod'
 import { Spacer } from '~/components/spacer.tsx'
 import { StatusButton } from '~/components/ui/status-button.tsx'
-import { authenticator, requireAnonymous, signup } from '~/utils/auth.server.ts'
+import { authenticator, getHankoSessionUser, requireAnonymous, signup } from '~/utils/auth.server.ts'
 import { CheckboxField, ErrorList, Field } from '~/components/forms.tsx'
 import { commitSession, getSession } from '~/utils/session.server.ts'
 import {
@@ -32,7 +32,7 @@ import { prisma } from '~/utils/db.server.ts'
 
 export const onboardingEmailSessionKey = 'onboardingEmail'
 
-const onboardingFormSchema = z
+const regularOnboardingFormSchema = z
 	.object({
 		username: usernameSchema,
 		name: nameSchema,
@@ -55,6 +55,19 @@ const onboardingFormSchema = z
 		}
 	})
 
+const hankoOnboardingFormSchema = z
+	.object({
+		username: usernameSchema,
+		name: nameSchema,
+		agreeToTermsOfServiceAndPrivacyPolicy: checkboxSchema(
+			'You must agree to the terms of service and privacy policy',
+		),
+		agreeToMailingList: checkboxSchema(),
+		remember: checkboxSchema(),
+		redirectTo: z.string().optional(),
+		password: z.string().optional(),
+	})
+
 export async function loader({ request }: DataFunctionArgs) {
 	await requireAnonymous(request)
 	const session = await getSession(request.headers.get('cookie'))
@@ -64,8 +77,9 @@ export async function loader({ request }: DataFunctionArgs) {
 		return redirect('/signup')
 	}
 	const message = error?.message ?? null
+	const hankoSession = await getHankoSessionUser(request)
 	return json(
-		{ formError: typeof message === 'string' ? message : null },
+		{ formError: typeof message === 'string' ? message : null, hankoSession },
 		{
 			headers: {
 				'Set-Cookie': await commitSession(session),
@@ -80,6 +94,8 @@ export async function action({ request }: DataFunctionArgs) {
 	if (typeof email !== 'string' || !email) {
 		return redirect('/signup')
 	}
+	const hankoSession = await getHankoSessionUser(request)
+	const onboardingFormSchema = hankoSession ? hankoOnboardingFormSchema : regularOnboardingFormSchema
 
 	const formData = await request.formData()
 	const submission = await parse(formData, {
@@ -115,12 +131,12 @@ export async function action({ request }: DataFunctionArgs) {
 	const {
 		username,
 		name,
-		password,
+		password="",
 		// TODO: add user to mailing list if they agreed to it
 		// agreeToMailingList,
 		remember,
 		redirectTo,
-	} = submission.value
+	} = submission.value 
 
 	const session = await signup({ email, username, password, name })
 
@@ -145,6 +161,8 @@ export default function OnboardingPage() {
 	const actionData = useActionData<typeof action>()
 	const navigation = useNavigation()
 	const formAction = useFormAction()
+
+	const onboardingFormSchema = data.hankoSession ? hankoOnboardingFormSchema : regularOnboardingFormSchema
 
 	const [form, fields] = useForm({
 		id: 'onboarding',
@@ -193,16 +211,16 @@ export default function OnboardingPage() {
 						}}
 						errors={fields.name.errors}
 					/>
-					<Field
+					{!data.hankoSession && <Field
 						labelProps={{ htmlFor: fields.password.id, children: 'Password' }}
 						inputProps={{
 							...conform.input(fields.password, { type: 'password' }),
 							autoComplete: 'new-password',
 						}}
 						errors={fields.password.errors}
-					/>
+					/>}
 
-					<Field
+					{!data.hankoSession && <Field
 						labelProps={{
 							htmlFor: fields.confirmPassword.id,
 							children: 'Confirm Password',
@@ -212,7 +230,7 @@ export default function OnboardingPage() {
 							autoComplete: 'new-password',
 						}}
 						errors={fields.confirmPassword.errors}
-					/>
+					/>}
 
 					<CheckboxField
 						labelProps={{
