@@ -6,6 +6,7 @@ import { FormStrategy } from 'remix-auth-form'
 import { prisma } from '~/utils/db.server.ts'
 import { invariant } from './misc.ts'
 import { sessionStorage } from './session.server.ts'
+import * as jose from "jose"
 
 export type { User }
 
@@ -14,6 +15,64 @@ export const authenticator = new Authenticator<string>(sessionStorage, {
 })
 
 const SESSION_EXPIRATION_TIME = 1000 * 60 * 60 * 24 * 30
+
+const JWKS_ENDPOINT = `${process.env.HANKO_API_URL}/.well-known/jwks.json`;
+
+export async function createSessionForUserId(userId: string) {
+	const session = await prisma.session.create({
+		data: {
+			expirationDate: new Date(Date.now() + SESSION_EXPIRATION_TIME),
+			userId,
+		},
+		select: { id: true, expirationDate: true },
+	})
+
+	return session
+}
+
+function parseCookies (request: Request) {
+    const list: Record<string, any> = {};
+    const cookieHeader = request.headers.get("Cookie");
+    if (!cookieHeader) return list;
+
+    cookieHeader.split(`;`).forEach(function(cookie) {
+        let [ name, ...rest] = cookie.split(`=`);
+        name = name?.trim();
+        if (!name) return;
+        const value = rest.join(`=`).trim();
+        if (!value) return;
+        list[name] = decodeURIComponent(value);
+    });
+
+    return list;
+}
+
+export function getHankoToken(request: Request): string | undefined {
+	const cookies = parseCookies(request)
+	if (cookies.hanko) {
+		return cookies.hanko
+	}
+
+	const authorization = request.headers.get("authorization");
+
+	if (authorization && authorization.split(" ")[0] === "Bearer") {
+		return authorization.split(" ")[1]
+	}
+}
+
+export async function getHankoSessionUser(request: Request) {
+	const token = getHankoToken(request)
+	if (token) {
+		const JWKS_CONFIG = jose.createRemoteJWKSet(new URL(JWKS_ENDPOINT))
+
+		try {
+			const { payload } = await jose.jwtVerify(token, JWKS_CONFIG);
+			console.log("payload", payload)
+			return payload
+		} catch (error) { // ignore error }
+	}
+	return null
+  }
 
 authenticator.use(
 	new FormStrategy(async ({ form }) => {

@@ -185,6 +185,10 @@ export function InlineLogin({
 				</loginFetcher.Form>
 				<div className="flex items-center justify-center gap-2 pt-6">
 					<span className="text-muted-foreground">New here?</span>
+					<Link to="/hanko-login">Login with Hanko</Link>
+				</div>
+				<div className="flex items-center justify-center gap-2 pt-6">
+					<span className="text-muted-foreground">New here?</span>
 					<Link to="/signup">Create an account</Link>
 				</div>
 			</div>
